@@ -23,8 +23,10 @@ serper_key = get_secret("SERPER_API_KEY")
 
 @st.cache_resource
 def get_available_gemini_model(api_key):
+    # 預設使用乾淨的名稱，避免 404 錯誤
+    default_model = "gemini-1.5-flash"
     if not api_key:
-        return "gemini-1.5-flash"
+        return default_model
     try:
         genai.configure(api_key=api_key)
         model_list = [
@@ -33,19 +35,21 @@ def get_available_gemini_model(api_key):
         ]
         debug_info = f"🔧 偵測到 {len(model_list)} 個可用模型\n" + "\n".join(model_list[:10])
         st.sidebar.info(debug_info[:500] + ("..." if len(model_list) > 10 else ""))
+        
         priority_patterns = ["gemini-1.5-flash-latest", "gemini-flash-latest", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
         for pattern in priority_patterns:
             for full_name in model_list:
                 if pattern in full_name:
-                    clean_name = full_name.replace("models/", "")
-                    return clean_name
+                    # 強制去掉 models/ 前綴以相容 v1beta
+                    return full_name.replace("models/", "")
+        
         if model_list:
-            clean_name = model_list[0].replace("models/", "")
-            return clean_name
-        return "gemini-1.5-flash"
+            return model_list[0].replace("models/", "")
+        return default_model
     except Exception as e:
-        st.sidebar.warning(f"⚠️ 模型列表取得失敗: {str(e)[:100]}")
-        return "gemini-1.5-flash"
+        # 如果是 403 Leaked Key 錯誤，這裡會捕獲並顯示
+        st.sidebar.warning(f"⚠️ 模型列表取得失敗 (請檢查新Key是否生效): {str(e)[:100]}")
+        return default_model
 
 available_model_path = get_available_gemini_model(api_key)
 
